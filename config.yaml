@@ -1,0 +1,69 @@
+server:
+  port: 8080
+  timeout: 30s
+
+providers:
+  openai:
+    enabled: true
+    api_key: ${OPENAI_API_KEY}
+    base_url: https://api.openai.com/v1
+    models:
+      - name: gpt-4o
+        input_cost: 0.005
+        output_cost: 0.015
+        rpm: 500
+        tpm: 100000
+      - name: gpt-4o-mini
+        input_cost: 0.0005
+        output_cost: 0.0015
+        rpm: 1000
+        tpm: 200000
+
+  anthropic:
+    enabled: true
+    api_key: ${ANTHROPIC_API_KEY}
+    base_url: https://api.anthropic.com
+    models:
+      - name: claude-sonnet-4-6
+        input_cost: 0.003
+        output_cost: 0.015
+        rpm: 200
+        tpm: 80000
+
+routing:
+  default:
+    strategy: fallback
+    order:
+      - provider: openai
+        model: gpt-4o
+      - provider: anthropic
+        model: claude-sonnet-4-6
+
+  cheap:
+    strategy: priority
+    order:
+      - provider: openai
+        model: gpt-4o-mini
+
+  fast:
+    strategy: load_balance
+    pool:
+      - provider: openai
+        model: gpt-4o-mini
+      - provider: anthropic
+        model: claude-sonnet-4-6
+
+limits:
+  global:
+    rpm: 2000
+    tpm: 500000
+  per_provider:
+    openai:
+      rpm: 1000
+    anthropic:
+      rpm: 500
+
+tracking:
+  enabled: true
+  currency: USD
+  log_usage: true

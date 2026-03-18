@@ -1,0 +1,96 @@
+package router
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+
+	"github.com/pranavnallari/glide/internal/adapter"
+	"github.com/pranavnallari/glide/internal/config"
+	"github.com/pranavnallari/glide/internal/models"
+)
+
+type Router struct {
+	routes         map[string]config.RouteConfig
+	providers      map[string]adapter.Provider
+	providerConfig map[string]config.ProviderConfig
+	ind            map[string]int
+}
+
+func NewRouter(routes map[string]config.RouteConfig, providers map[string]adapter.Provider, provCfg map[string]config.ProviderConfig) *Router {
+	return &Router{
+		routes:         routes,
+		providers:      providers,
+		providerConfig: provCfg,
+		ind:            make(map[string]int),
+	}
+}
+
+func (r *Router) Route(ctx context.Context, req *models.UnifiedRequest) (*models.UnifiedResponse, error) {
+	routeCfg, ok := r.routes[req.Strategy]
+	if !ok {
+		routeCfg = r.routes["default"]
+	}
+
+	strategy := routeCfg.Strategy
+	switch strategy {
+	case "fallback":
+		return r.routeFallback(ctx, req, routeCfg)
+	case "priority":
+		return r.routePriority(ctx, req, routeCfg)
+	case "load_balance":
+		return r.routeLoadBalance(ctx, req, routeCfg)
+	default:
+		return nil, errors.New("unknown strategy")
+	}
+}
+
+func (r *Router) routeFallback(ctx context.Context, req *models.UnifiedRequest, route config.RouteConfig) (*models.UnifiedResponse, error) {
+	for i := range len(route.Order) {
+		req.Model = route.Order[i].Model
+		provider := r.providers[route.Order[i].Provider]
+
+		res, err := provider.Call(ctx, req)
+		if err != nil {
+			slog.Warn("provider failed", "provider", route.Order[i].Provider, "error", err)
+			continue
+		}
+
+		return res, nil
+	}
+
+	return nil, errors.New("all providers failed")
+}
+
+func (r *Router) routePriority(ctx context.Context, req *models.UnifiedRequest, route config.RouteConfig) (*models.UnifiedResponse, error) {
+	for i := range len(route.Order) {
+		provider := r.providers[route.Order[i].Provider]
+
+		if !r.providerConfig[provider.Name()].Enabled {
+			continue
+		}
+		req.Model = route.Order[i].Model
+		res, err := provider.Call(ctx, req)
+		if err != nil {
+			slog.Warn("provider failed", "provider", route.Order[i].Provider, "error", err)
+			continue
+		}
+
+		return res, nil
+	}
+	return nil, errors.New("no healthy providers")
+}
+
+func (r *Router) routeLoadBalance(ctx context.Context, req *models.UnifiedRequest, route config.RouteConfig) (*models.UnifiedResponse, error) {
+	if len(route.Pool) == 0 {
+		return nil, errors.New("load balance pool is empty")
+	}
+
+	currInd := r.ind[route.Strategy] % len(route.Pool)
+
+	req.Model = route.Pool[currInd].Model
+	provider := r.providers[route.Pool[currInd].Provider]
+	r.ind[route.Strategy] = currInd + 1
+	return provider.Call(ctx, req)
+
+}
