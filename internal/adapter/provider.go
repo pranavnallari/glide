@@ -45,7 +45,7 @@ func (p *OpenAIProvider) Call(ctx context.Context, req *models.UnifiedRequest) (
 		return nil, err
 	}
 
-	httpReq, err := http.NewRequest("POST", p.cfg.BaseURL+"/chat/completions", bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.cfg.BaseURL+"/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (p *AnthropicProvider) Call(ctx context.Context, req *models.UnifiedRequest
 		return nil, err
 	}
 
-	httpReq, err := http.NewRequest("POST", p.cfg.BaseURL+"/v1/messages", bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.cfg.BaseURL+"/v1/messages", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, err
 	}

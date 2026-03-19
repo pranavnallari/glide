@@ -15,10 +15,11 @@ type LocalConfig struct {
 	Routing   map[string]RouteConfig    `yaml:"routing"`
 	Limits    LimitsConfig              `yaml:"limits"`
 	Tracking  TrackingConfig            `yaml:"tracking"`
+	Keys      map[string]KeyConfig      `yaml:"keys"`
 }
 
 type ServerConfig struct {
-	Port    int           `yaml:"port"`
+	Port    string        `yaml:"port"`
 	Timeout time.Duration `yaml:"timeout"`
 }
 
@@ -56,6 +57,10 @@ type LimitsConfig struct {
 type RateLimitConfig struct {
 	RPM int `yaml:"rpm"`
 	TPM int `yaml:"tpm"`
+}
+
+type KeyConfig struct {
+	RPM int `yaml:"rpm"`
 }
 
 type TrackingConfig struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 
 	"github.com/pranavnallari/glide/internal/adapter"
 	"github.com/pranavnallari/glide/internal/config"
@@ -11,6 +12,7 @@ import (
 )
 
 type Router struct {
+	sync.Mutex
 	routes         map[string]config.RouteConfig
 	providers      map[string]adapter.Provider
 	providerConfig map[string]config.ProviderConfig
@@ -39,7 +41,7 @@ func (r *Router) Route(ctx context.Context, req *models.UnifiedRequest) (*models
 	case "priority":
 		return r.routePriority(ctx, req, routeCfg)
 	case "load_balance":
-		return r.routeLoadBalance(ctx, req, routeCfg)
+		return r.routeLoadBalance(ctx, strategy, req, routeCfg)
 	default:
 		return nil, errors.New("unknown strategy")
 	}
@@ -81,16 +83,20 @@ func (r *Router) routePriority(ctx context.Context, req *models.UnifiedRequest, 
 	return nil, errors.New("no healthy providers")
 }
 
-func (r *Router) routeLoadBalance(ctx context.Context, req *models.UnifiedRequest, route config.RouteConfig) (*models.UnifiedResponse, error) {
+func (r *Router) routeLoadBalance(ctx context.Context, routeName string, req *models.UnifiedRequest, route config.RouteConfig) (*models.UnifiedResponse, error) {
 	if len(route.Pool) == 0 {
 		return nil, errors.New("load balance pool is empty")
 	}
 
-	currInd := r.ind[route.Strategy] % len(route.Pool)
+	r.Lock()
 
+	currInd := r.ind[routeName] % len(route.Pool)
 	req.Model = route.Pool[currInd].Model
 	provider := r.providers[route.Pool[currInd].Provider]
-	r.ind[route.Strategy] = currInd + 1
+	r.ind[routeName] = currInd + 1
+
+	r.Unlock()
+
 	return provider.Call(ctx, req)
 
 }

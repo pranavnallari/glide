@@ -1,7 +1,11 @@
 server:
   port: 8080
   timeout: 30s
-
+keys:
+  my-app-key:
+    rpm: 100
+  internal-key:
+    rpm: 500
 providers:
   openai:
     enabled: true
