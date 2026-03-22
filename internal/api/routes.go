@@ -11,5 +11,6 @@ func NewRouter(h *Handler) *http.ServeMux {
 
 	mux.HandleFunc("POST /chat", h.Chat)
 	mux.Handle("GET /metrics", promhttp.Handler())
+	mux.HandleFunc("GET /health", h.Health)
 	return mux
 }
