@@ -13,7 +13,10 @@ import (
 	"github.com/pranavnallari/glide/internal/adapter"
 	"github.com/pranavnallari/glide/internal/api"
 	"github.com/pranavnallari/glide/internal/config"
+	"github.com/pranavnallari/glide/internal/limiter"
+	"github.com/pranavnallari/glide/internal/observability"
 	"github.com/pranavnallari/glide/internal/router"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
@@ -28,6 +31,10 @@ func main() {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
+
+	metrics := observability.NewMetrics(prometheus.DefaultRegisterer)
+	limiter := limiter.NewLimiter(conf)
+
 	providers := make(map[string]adapter.Provider)
 	for name, p := range conf.Providers {
 		if p.Enabled {
@@ -47,9 +54,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	llmRouter := router.NewRouter(conf.Routing, providers, conf.Providers)
+	llmRouter := router.NewRouter(conf.Routing, providers, conf.Providers, limiter)
 
-	handler := api.NewHandler(llmRouter)
+	handler := api.NewHandler(llmRouter, limiter, metrics)
 
 	httpRouter := api.NewRouter(handler)
 
